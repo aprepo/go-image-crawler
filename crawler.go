@@ -1,39 +1,17 @@
 package main
 
 import (
-	"crypto/md5"
-	"encoding/hex"
+	"crawler/handlers"
+	"database/sql"
 	"fmt"
-	"io"
 	"log"
 	"os"
 	"path/filepath"
+
+	_ "github.com/mattn/go-sqlite3"
 )
 
-func handleDirectory(path string, info os.FileInfo) {
-	log.Println("Handling directory : " + path)
-}
-
-func handleFile(path string, info os.FileInfo) {
-	log.Print("Handling file : " + path)
-	file, err := os.Open(path)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer file.Close()
-
-	hash := md5.New()
-	if _, err := io.Copy(hash, file); err != nil {
-		log.Fatal(err)
-	}
-
-	// Get the resulting MD5 sum
-	hashInBytes := hash.Sum(nil)[:16]
-
-	// Convert it to a hexadecimal string
-	hashString := hex.EncodeToString(hashInBytes)
-	log.Println(" MD5: " + hashString)
-}
+var db *sql.DB
 
 func callback(path string, info os.FileInfo, err error) error {
 	if err != nil {
@@ -41,20 +19,38 @@ func callback(path string, info os.FileInfo, err error) error {
 		return err
 	}
 	if info.IsDir() {
-		handleDirectory(path, info)
+		handlers.HandleDirectory(path, info)
 	} else {
-		handleFile(path, info)
+		meta := handlers.HandleFile(path, info)
+		meta.DisplaySummary()
+		// TODO: Store to database
 	}
 	// fmt.Printf("dir: %v: name: %s\n", info.IsDir(), path)
 	return nil
+}
+
+func setupDatabase() *sql.DB {
+	db, err := sql.Open("sqlite3", "./files.db")
+	if err != nil {
+		log.Fatal(err)
+	}
+	return db
+}
+
+func scanFiles(path string) {
+	err := filepath.Walk(path, callback)
+	if err != nil {
+		log.Fatal(err)
+	}
 }
 
 func main() {
 	args := os.Args
 	path := args[1]
 	fmt.Println("Search files from: " + path)
-	err := filepath.Walk(path, callback)
-	if err != nil {
-		log.Fatal(err)
-	}
+
+	db = setupDatabase()
+	defer db.Close()
+
+	scanFiles(path)
 }
