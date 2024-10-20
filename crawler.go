@@ -1,8 +1,8 @@
 package main
 
 import (
+	"crawler/filedb"
 	"crawler/handlers"
-	"database/sql"
 	"fmt"
 	"log"
 	"os"
@@ -26,16 +26,8 @@ func callback(path string, info os.FileInfo, err error) error {
 	return nil
 }
 
-func setupDatabase() *sql.DB {
-	db, err := sql.Open("sqlite3", "./files.db")
-	if err != nil {
-		log.Fatal(err)
-	}
-	return db
-}
-
 type FileScanner struct {
-	db *sql.DB
+	db *filedb.FileDatabase
 }
 
 func (self FileScanner) scanFiles(path string) {
@@ -50,11 +42,12 @@ func main() {
 	path := args[1]
 	fmt.Println("Search files from: " + path)
 
-	db := setupDatabase()
-	defer db.Close()
+	fileDb := filedb.FileDatabase{}
+	fileDb.SetupDatabase()
+	defer fileDb.Close()
 
 	scanner := FileScanner{
-		db: db,
+		db: &fileDb,
 	}
 	scanner.scanFiles(path)
 }
